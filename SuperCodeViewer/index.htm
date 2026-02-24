@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>SuperCodeViewer</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Roboto+Condensed:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    pre {
+      max-height: 97vh;
+      overflow-y: auto;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    code {
+      display: block;
+      width: max-content;
+    }
+
+    pre::-webkit-scrollbar {
+      width: 15px;
+      height: 15px;
+    }
+
+    pre::-webkit-scrollbar-thumb {
+      background: #666;
+    }
+
+    pre::-webkit-scrollbar-track {
+      background: #f5f5f5;
+    }
+
+    pre {
+      scrollbar-width: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <main>
+    <h1>SuperCodeViewer</h1>
+
+    <p>Read JSON with embedded Markdown like in n8n.</p>
+
+    <div class="dropzone" id="dropzone">
+      Select a file
+    </div>
+
+    <textarea placeholder="Insert your code" id="textarea"></textarea>
+
+    <br><button id="convertBtn">Super Code View!</button>
+
+    <div id="output">
+      <pre id="preOutput"><code id="codeOutput"></code></pre>
+    </div>
+
+  </main>
+
+  <script src="../js/dropzone.js"></script>
+  <script>
+    createDropzone(
+      document.getElementById('dropzone'),
+      document.getElementById('textarea')
+    );
+  </script>
+
+
+  <!--
+Available styles: https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/styles/
+Examples: https://highlightjs.org/examples
+Demo: https://highlightjs.org/demo
+Click-through-examples: https://highlightjs.tiddlyhost.com
+Base16 examples: https://alex-courtis.github.io/base16-site/
+-->
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/base16/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+
+  <script>
+    const textarea = document.getElementById("textarea");
+    const btn = document.getElementById("convertBtn");
+
+    // Wraps text by splitting at the last non-alphanumeric character (including German umlauts and numbers)
+    // within maxLength to keep words intact, while preserving existing newlines. Gemini 3 powered.
+    function wrapText(text, maxLength = 120) {
+      const lines = text.split('\n');
+      const wrappedLines = [];
+      const wordChar = /[A-Za-z0-9äöüÄÖÜß]/;
+
+      for (let line of lines) {
+        let remainingText = line;
+
+        while (remainingText.length > maxLength) {
+          let cutIndex = maxLength;
+
+          if (wordChar.test(remainingText[cutIndex - 1]) && wordChar.test(remainingText[cutIndex])) {
+            while (cutIndex > 0 && wordChar.test(remainingText[cutIndex - 1])) {
+              cutIndex--;
+            }
+          }
+
+          if (cutIndex === 0) {
+            cutIndex = maxLength;
+          }
+
+          wrappedLines.push(remainingText.slice(0, cutIndex).trimEnd());
+          remainingText = remainingText.slice(cutIndex).trimStart();
+        }
+
+        wrappedLines.push(remainingText);
+      }
+
+      return wrappedLines.join("\n");
+    }
+
+    btn.addEventListener("click", () => {
+      let preOutput = document.getElementById("preOutput");
+      // Reset to proceed next file
+      // for strict-mode add: class=\"language-json\"
+      preOutput.innerHTML = "<code id=\"codeOutput\"></code>";
+      let codeOutput = document.getElementById("codeOutput");
+
+      let text = textarea.value.trim();
+
+      // Nothing to do here
+      if (!text.trim()) return;
+
+      // Add linebreak after \n and <br>
+      text = text
+        .replace(/\\n/g, "\\n\n")
+        .replace(/\\n\n\\n/g, "\\n\\n\n") // No linebreak between double \n
+        .replace(/<br\s*\/?>/gi, "<br>\n")
+
+      // Wrap long lines
+      text = wrapText(text, 120);
+
+      // Insert HTML characters
+      text = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;")
+
+      // Highlight
+      codeOutput.innerHTML = text;
+      hljs.highlightAll();
+
+      // Light color for control symbols
+      codeOutput.innerHTML = codeOutput.innerHTML
+        .replace(/\\n/g, '<span style="color:#ccc">\\n</span>')
+        .replace(/\\t/g, '<span style="color:#ccc">\\t</span>')
+        .replace(/&lt;br\s*\/?&gt;/gi, '<span style="color:#ccc">&lt;br&gt;</span>')
+        .replace(/(?<!\\)\\\"/g, '<span style="color:#ccc">\\\"</span>'); // \" with negative lookbehind
+
+      // Scroll to code
+      requestAnimationFrame(() => {
+        const outputElement = document.getElementById("output");
+        const rect = outputElement.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const targetY = rect.top + scrollTop - 10;
+        window.scrollTo({
+          top: targetY,
+          behavior: "smooth"
+        });
+      });
+    });
+  </script>
+
+</body>
+
+</html>
